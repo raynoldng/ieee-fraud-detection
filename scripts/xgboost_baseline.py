@@ -134,8 +134,8 @@ def encode_categorical_features(df_train, df_test):
 
 def drop_V_features(df):
     # applying the PCA is major PITA, for now just drop it
-    mas_v = df.columns[55:394]
-    df = df.drop(mas_v)
+    mas_v = [c for c in df.columns if c.startswith('V')]
+    df = df.drop(mas_v, axis=1)
 
     return df
 
@@ -147,13 +147,6 @@ def set_X_and_y(df_train):
                                                         ],
                                                         axis=1)
     y_train = df_train.sort_values('TransactionDT')['isFraud'].astype(bool)
-
-    # X_test = df_test.sort_values('TransactionDT').drop(['TransactionDT',
-    #                                                     #'Card_ID'
-    #                                                 ], 
-    #                                                 axis=1)
-    # del df_train
-    # df_test = df_test[["TransactionDT"]]
 
     return X_train, y_train
 
@@ -204,6 +197,8 @@ def __objective(params):
         clf = xgb.XGBClassifier(
             n_estimators=600, random_state=4, verbose=True, 
             tree_method='hist', # my desktop does not support CUDA :( 
+            # tree_method='gpu_hist',
+            # predictor='gpu_predictor',
             nthread=8,
             **params
         )
@@ -295,28 +290,37 @@ space = {
 }
 
 
+NUM_RUNS = 15
+
 if __name__ == "__main__":
 
     # loading data takes approximately 28 secs
+    time1 = time.time()
     df_train, df_test = load_data()
-    print("Done loading data")
+    time2 = time.time() - time1
+    print(f"Done loading data in {round(time2 / 60,2)} min")
+
+    print("Before:")
     print(f"Train: {df_train.shape}")
     print(f"Test: {df_test.shape}")
 
-    # print("Before", df_train.shape)
-    # df = df_train.reset_index()
-    # df = df.drop('index', axis=1)
-    # print("After", df.shape)
-
     # feature engineering stuff
+    df_train = map_emails(df_train)
+    df_test = map_emails(df_test)
+
+    df_train = drop_V_features(df_train) # this should be why the training is so slow
+    df_test = drop_V_features(df_test) # this should be why the training is so slow
+
     df_train, df_test = encode_categorical_features(df_train, df_test)
-    # df_train = map_emails(df_train)
-    # df_train = drop_V_features(df_train)
-    print("done with feature engineering")
+    time2 = time.time() - time1
+
+    print("After:")
+    print(f"Train: {df_train.shape}")
+    print(f"Test: {df_test.shape}")
+    print(f"done with feature engineering in {round(time2 / 60, 2)} min")
 
     X_train, y_train = set_X_and_y(df_train)
     
-    print("df_train", df_train.shape)
     print("X_train", X_train.shape)
     print("y_train", y_train.shape)
 
@@ -325,9 +329,12 @@ if __name__ == "__main__":
     best = fmin(fn=objective(X_train, y_train),
                 space=space,
                 algo=tpe.suggest,
-                max_evals=27)
+                max_evals=NUM_RUNS)
 
     # Print best parameters
     best_params = space_eval(space, best)
+    print("Best_params: ", best_params)
+
+    print("Done")
     
 
