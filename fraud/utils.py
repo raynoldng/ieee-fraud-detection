@@ -43,19 +43,22 @@ def reduce_mem_usage(df, verbose=True):
     return df
 
 
-def load_data(sample=False):
+def load_data(sample=False, reduce_mem=True):
     # if sample is true, returns only 10 000  rows for training and test
     df_trans = pd.read_csv("../input/train_transaction.csv")
     df_test_trans = pd.read_csv("../input/test_transaction.csv")
+    df_id = pd.read_csv("../input/train_identity.csv")
+    df_test_id = pd.read_csv("../input/test_identity.csv")
 
     if sample:
         df_trans = df_trans.sample(n=10000)
         df_test_trans = df_test_trans.sample(n=10000)
 
-    df_id = pd.read_csv("../input/train_identity.csv")
-    df_test_id = pd.read_csv("../input/test_identity.csv")
-
-    # sample_submission = pd.read_csv('../input/sample_submission.csv', index_col='TransactionID')
+    if reduce_mem:
+        df_trans = reduce_mem_usage(df_trans)
+        df_test_trans = reduce_mem_usage(df_test_trans)
+        df_id = reduce_mem_usage(df_id)
+        df_test_id = reduce_mem_usage(df_test_id)
 
     df_train = df_trans.merge(
         df_id, how="left", left_index=True, right_index=True, on="TransactionID"
