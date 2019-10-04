@@ -9,145 +9,22 @@ import gc
 from bayes_opt import BayesianOptimization
 import warnings
 
+import os, sys
+full_path = os.path.realpath(__file__)
+path, filename = os.path.split(full_path)
+sys.path.append(path + '/../')
+import fraud.utils as utils
+import fraud.feature_engineering as fe
+
 warnings.filterwarnings("ignore")
-# from hyperopt import fmin, hp, tpe, Trials, space_eval, STATUS_OK, STATUS_RUNNING
-from functools import partial
 
-# Memory saving function credit to https://www.kaggle.com/gemartin/load-data-reduce-memory-usage
-def reduce_mem_usage(df):
-    """ iterate through all the columns of a dataframe and modify the data type
-        to reduce memory usage.
-    """
-    start_mem = df.memory_usage().sum() / 1024 ** 2
+train, test = utils.load_data()
+train, test = fe.drop_mostly_null_and_skewed_cols(train, test)
+train, test = fe.map_emails(train), fe.map_emails(test)
+train, test = fe.map_transaction_amount(train), fe.map_transaction_amount(test)
+train, test = fe.map_transaction_dt(train), fe.map_transaction_dt(test)
 
-    for col in df.columns:
-        col_type = df[col].dtype
-
-        if col_type != object:
-            c_min = df[col].min()
-            c_max = df[col].max()
-            if str(col_type)[:3] == "int":
-                if c_min > np.iinfo(np.int8).min and c_max < np.iinfo(np.int8).max:
-                    df[col] = df[col].astype(np.int8)
-                elif c_min > np.iinfo(np.int16).min and c_max < np.iinfo(np.int16).max:
-                    df[col] = df[col].astype(np.int16)
-                elif c_min > np.iinfo(np.int32).min and c_max < np.iinfo(np.int32).max:
-                    df[col] = df[col].astype(np.int32)
-                elif c_min > np.iinfo(np.int64).min and c_max < np.iinfo(np.int64).max:
-                    df[col] = df[col].astype(np.int64)
-            else:
-                if (
-                    c_min > np.finfo(np.float16).min
-                    and c_max < np.finfo(np.float16).max
-                ):
-                    df[col] = df[col].astype(np.float16)
-                elif (
-                    c_min > np.finfo(np.float32).min
-                    and c_max < np.finfo(np.float32).max
-                ):
-                    df[col] = df[col].astype(np.float32)
-                else:
-                    df[col] = df[col].astype(np.float64)
-        # else:
-        # df[col] = df[col].astype('category')
-    end_mem = df.memory_usage().sum() / 1024 ** 2
-    print(
-        "Memory usage of dataframe is {:.2f} MB --> {:.2f} MB (Decreased by {:.1f}%)".format(
-            start_mem, end_mem, 100 * (start_mem - end_mem) / start_mem
-        )
-    )
-    return df
-
-
-train_trains = pd.read_csv("../input/train_transaction.csv", index_col="TransactionID")
-train_id = pd.read_csv("../input/train_identity.csv", index_col="TransactionID")
-test_trains = pd.read_csv("../input/test_transaction.csv", index_col="TransactionID")
-test_id = pd.read_csv("../input/test_identity.csv", index_col="TransactionID")
-
-train_trains = reduce_mem_usage(train_trains)
-train_id = reduce_mem_usage(train_id)
-test_trains = reduce_mem_usage(test_trains)
-test_id = reduce_mem_usage(test_id)
-
-train = pd.merge(train_trains, train_id, on="TransactionID", how="left")
-test = pd.merge(test_trains, test_id, on="TransactionID", how="left")
-train = train.reset_index()
-test = test.reset_index()
-
-del train_id, train_trains, test_id, test_trains
-gc.collect()
-
-
-def label_collector(string):
-    label = string.split(".")[0]
-    return label
-
-
-cols_drop_train = [
-    cols for cols in train.columns if train[cols].isnull().sum() / train.shape[0] > 0.9
-]
-cols_drop_test = [
-    cols for cols in test.columns if test[cols].isnull().sum() / test.shape[0] > 0.9
-]
-big_top_value_cols = [
-    col
-    for col in train.columns
-    if train[col].value_counts(dropna=False, normalize=True).values[0] > 0.9
-]
-big_top_value_cols_test = [
-    col
-    for col in test.columns
-    if test[col].value_counts(dropna=False, normalize=True).values[0] > 0.9
-]
-drop_cols = list(
-    set(cols_drop_train + cols_drop_test + big_top_value_cols + big_top_value_cols_test)
-)
-drop_cols.remove("isFraud")
-
-train.drop(drop_cols, axis=1, inplace=True)
-test.drop(drop_cols, axis=1, inplace=True)
-
-del (
-    cols_drop_test,
-    cols_drop_train,
-    big_top_value_cols,
-    big_top_value_cols_test,
-    drop_cols,
-)
-
-train[["P_emaildomain_1", "P_emaildomain_2", "P_emaildomain_3"]] = train[
-    "P_emaildomain"
-].str.split(".", expand=True)
-train[["R_emaildomain_1", "R_emaildomain_2", "R_emaildomain_3"]] = train[
-    "R_emaildomain"
-].str.split(".", expand=True)
-test[["P_emaildomain_1", "P_emaildomain_2", "P_emaildomain_3"]] = test[
-    "P_emaildomain"
-].str.split(".", expand=True)
-test[["R_emaildomain_1", "R_emaildomain_2", "R_emaildomain_3"]] = test[
-    "R_emaildomain"
-].str.split(".", expand=True)
-
-print("String columns")
-print([cols for cols in train.columns if train[cols].dtype == "O"])
-
-
-def labelencode(train, test):
-    for col in train.drop(
-        ["TransactionID", "isFraud", "TransactionDT"], axis=1
-    ).columns:
-        if train[col].dtype == "O" or test[col].dtype == "O":
-            le = LabelEncoder()
-            le.fit(
-                list(train[col].astype(str).values) + list(test[col].astype(str).values)
-            )
-            train[col] = le.transform(list(train[col].astype(str).values))
-            test[col] = le.transform(list(test[col].astype(str).values))
-    return train, test
-
-
-train, test = labelencode(train, test)
-
+train, test = fe.encode_categorical_features(train, test)
 y_test = train["isFraud"]
 
 cols_drops = ["TransactionID", "isFraud", "TransactionDT"]
@@ -251,4 +128,3 @@ with warnings.catch_warnings():
 
 print("target", LGB_BO.max["target"])
 print("params", LGB_BO.max["params"])
-
