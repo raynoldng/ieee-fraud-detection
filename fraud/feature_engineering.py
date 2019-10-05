@@ -79,6 +79,7 @@ def map_emails(df):
 
 
 def map_transaction_amount(train, test):
+    # TODO this is causing the tuning to fail
     test['isFraud'] = 'test'
     temp = pd.concat([train, test], axis=0, sort=False)
 
