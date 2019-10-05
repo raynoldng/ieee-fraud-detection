@@ -25,20 +25,25 @@ params = {
     "reg_alpha": 0.7735276016066162,
     "reg_lambda": 0.5664371765586673,
 }
+
+for param in ["num_leaves", "max_depth", "min_data_in_leaf"]:
+    params[param] = int(params[param])
+
 num_boost_round = 1000
 
-train, test = load_data()
+train, test = load_data(reduce_mem=False)
 
-train, test = fe.drop_mostly_null_and_skewed_cols(train, test)
-train, test = fe.map_emails(train), fe.map_emails(test)
-train, test = fe.map_transaction_amount(train), fe.map_transaction_amount(test)
-train, test = fe.map_transaction_df(train), fe.map_transaction_df(test)
-train, test = fe.encode_categorical_features(train, test)
+# train, test = fe.drop_mostly_null_and_skewed_cols(train, test)
+# train, test = fe.map_emails(train), fe.map_emails(test)
+# train, test = fe.map_transaction_amount(train), fe.map_transaction_amount(test)
+# train, test = fe.map_transaction_dt(train), fe.map_transaction_dt(test)
+# train, test = fe.encode_categorical_features(train, test)
 
 y_test = train["isFraud"]
 
-d_train = lgb.Dataset(train, label=y_test)
-d_train.save_binary("baseline_txn_amt_dt")
+# d_train = lgb.Dataset(train, label=y_test)
+# d_train.save_binary("baseline_txn_amt_dt")
+d_train = lgb.Dataset("../input/baseline_txn_amt_dt")
 print("saving data binary")
 
 model = lgb.train(params, d_train, verbose_eval=False, num_boost_round=1000)

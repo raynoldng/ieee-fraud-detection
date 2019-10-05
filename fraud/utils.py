@@ -74,9 +74,6 @@ def load_data(sample=False, reduce_mem=True):
     del df_trans, df_id, df_test_trans, df_test_id
     gc.collect()
 
-    df_train = df_train.reset_index()
-    df_test = df_test.reset_index()
-
     return df_train, df_test
 
 

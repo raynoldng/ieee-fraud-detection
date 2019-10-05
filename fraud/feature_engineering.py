@@ -78,26 +78,29 @@ def map_emails(df):
     return df
 
 
-def map_transaction_amount(df):
-    df['Trans_min_mean'] = df['TransactionAmt'] - df['TransactionAmt'].mean()
-    df['Trans_min_std'] = df['Trans_min_mean'] / df['TransactionAmt'].std()
+def map_transaction_amount(train, test):
+    test['isFraud'] = 'test'
+    temp = pd.concat([train, test], axis=0, sort=False)
 
-    df['TransactionAmt_to_mean_card1'] = df['TransactionAmt'] / df.groupby(['card1'])['TransactionAmt'].transform('mean')
-    df['TransactionAmt_to_mean_card4'] = df['TransactionAmt'] / df.groupby(['card4'])['TransactionAmt'].transform('mean')
-    df['TransactionAmt_to_std_card1'] = df['TransactionAmt'] / df.groupby(['card1'])['TransactionAmt'].transform('std')
-    df['TransactionAmt_to_std_card4'] = df['TransactionAmt'] / df.groupby(['card4'])['TransactionAmt'].transform('std')
+    temp['Trans_min_mean'] = temp['TransactionAmt'] - temp['TransactionAmt'].mean()
+    temp['Trans_min_std'] = temp['Trans_min_mean'] / temp['TransactionAmt'].std()
 
-    df['TransactionAmt_log'] = np.log(df['TransactionAmt'])
+    temp['TransactionAmt_to_mean_card1'] = temp['TransactionAmt'] / temp.groupby(['card1'])['TransactionAmt'].transform('mean')
+    temp['TransactionAmt_to_mean_card4'] = temp['TransactionAmt'] / temp.groupby(['card4'])['TransactionAmt'].transform('mean')
+    temp['TransactionAmt_to_std_card1'] = temp['TransactionAmt'] / temp.groupby(['card1'])['TransactionAmt'].transform('std')
+    temp['TransactionAmt_to_std_card4'] = temp['TransactionAmt'] / temp.groupby(['card4'])['TransactionAmt'].transform('std')
 
-    df['TransactionAmt_cents'] = df['TransactionAmt'] % 1
+    temp['TransactionAmt_log'] = np.log(temp['TransactionAmt'])
 
-    return df
+    temp['TransactionAmt_cents'] = temp['TransactionAmt'] % 1
+
+    train = temp[temp['isFraud'] != 'test']
+    test = temp[temp['isFraud'] == 'test'].drop('isFraud', axis=1)
+
+    return train, test
 
 
 def encode_categorical_features(df_train, df_test):
-    # NOTE this is the only feature engineering function that takes in both df_train 
-    # df_test, this is because we want values across test and train datasets
-
     for f in df_train.drop('isFraud', axis=1).columns:
         if df_train[f].dtype=='object' or df_test[f].dtype=='object': 
             lbl = preprocessing.LabelEncoder()
@@ -123,5 +126,7 @@ def map_transaction_dt(df):
     df['_Weekdays'] = df['Date'].dt.dayofweek
     df['_Hours'] = df['Date'].dt.hour
     df['_Days'] = df['Date'].dt.day
+
+    df.drop('Date', axis=1, inplace=True)
 
     return df

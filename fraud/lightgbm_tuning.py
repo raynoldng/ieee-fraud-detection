@@ -21,28 +21,6 @@ bound_lgb = {
 
 
 def tune(train, y_test, init_points=10, n_iter=15):
-    train_m, val_m_train, val1, val2 = train_test_split(
-        train, y_test, test_size=0.3, random_state=10, stratify=y_test
-    )
-    train_m_index = train_m.index
-    val_m_index = val_m_train.index
-    val1_index = val1.index
-    val2_index = val2.index
-
-    lgb_bo = BayesianOptimization(objective, bound_lgb, random_state=42)
-    print("-" * 130)
-
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore")
-        lgb_bo.maximize(
-            init_points=init_points, n_iter=n_iter, acq="ucb", xi=0.0, alpha=1e-5
-        )
-
-    target = lgb_bo.max["target"]
-    params = lgb_bo.max["params"]
-
-    return target, params
-
     def objective(
         num_leaves,
         min_child_weight,
@@ -91,5 +69,28 @@ def tune(train, y_test, init_points=10, n_iter=15):
             early_stopping_rounds=early_stopping_rounds,
             verbose_eval=0,
         )
+
         score = roc_auc_score(val2, model_lgb.predict(val_m_train))
         return score
+    train_m, val_m_train, val1, val2 = train_test_split(
+        train, y_test, test_size=0.3, random_state=10, stratify=y_test
+    )
+    train_m_index = train_m.index
+    val_m_index = val_m_train.index
+    val1_index = val1.index
+    val2_index = val2.index
+
+    lgb_bo = BayesianOptimization(objective, bound_lgb, random_state=42)
+    print("-" * 130)
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore")
+        lgb_bo.maximize(
+            init_points=init_points, n_iter=n_iter, acq="ucb", xi=0.0, alpha=1e-5
+        )
+
+    target = lgb_bo.max["target"]
+    params = lgb_bo.max["params"]
+
+    return target, params
+
