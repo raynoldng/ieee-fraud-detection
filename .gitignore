@@ -3,6 +3,7 @@ input
 .vscode
 # IPython Notebook
 .ipynb_checkpoints/
+processed_input
 
 # pyenv
 .python-version
