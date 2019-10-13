@@ -2,10 +2,10 @@ import pandas as pd
 import datetime
 import numpy as np
 from sklearn import preprocessing
+import gc
 
 #############################################
 # Feature Engineering
-# TODO time delta mapping
 # TODO PCA for V features
 # TODO SVD for V features
 #############################################
@@ -79,27 +79,22 @@ def map_emails(df):
 
 
 def map_transaction_amount(train, test):
-    # TODO this is causing the tuning to fail
     test['isFraud'] = 'test'
     temp = pd.concat([train, test], axis=0, sort=False)
 
     temp['Trans_min_mean'] = temp['TransactionAmt'] - temp['TransactionAmt'].mean()
     temp['Trans_min_std'] = temp['Trans_min_mean'] / temp['TransactionAmt'].std()
 
-    temp['TransactionAmt_to_mean_card1'] = temp['TransactionAmt'] / temp.groupby(['card1'])['TransactionAmt'].transform('mean')
-    temp['TransactionAmt_to_mean_card4'] = temp['TransactionAmt'] / temp.groupby(['card4'])['TransactionAmt'].transform('mean')
-    temp['TransactionAmt_to_std_card1'] = temp['TransactionAmt'] / temp.groupby(['card1'])['TransactionAmt'].transform('std')
-    temp['TransactionAmt_to_std_card4'] = temp['TransactionAmt'] / temp.groupby(['card4'])['TransactionAmt'].transform('std')
-
     temp['TransactionAmt_log'] = np.log(temp['TransactionAmt'])
-
-    temp['TransactionAmt_cents'] = temp['TransactionAmt'] % 1
-
+    
+    nice_vals = [0, 950, 949, 500]
+    temp['TransactionAmt_cents'] = np.floor((temp['TransactionAmt'] % 1) * 1000)
+    temp['TransactionAmt_cents_nice'] = temp['TransactionAmt_cents'].isin(nice_vals)
+    
     train = temp[temp['isFraud'] != 'test']
     test = temp[temp['isFraud'] == 'test'].drop('isFraud', axis=1)
 
     return train, test
-
 
 def encode_categorical_features(df_train, df_test):
     for f in df_train.drop('isFraud', axis=1).columns:
@@ -131,3 +126,44 @@ def map_transaction_dt(df):
     df.drop('Date', axis=1, inplace=True)
 
     return df
+
+def id_split(dataframe):
+    dataframe['device_name'] = dataframe['DeviceInfo'].str.split('/', expand=True)[0]
+    dataframe['device_version'] = dataframe['DeviceInfo'].str.split('/', expand=True)[1]
+
+    dataframe['OS_id_30'] = dataframe['id_30'].str.split(' ', expand=True)[0]
+    dataframe['version_id_30'] = dataframe['id_30'].str.split(' ', expand=True)[1]
+
+    dataframe['browser_id_31'] = dataframe['id_31'].str.split(' ', expand=True)[0]
+    dataframe['version_id_31'] = dataframe['id_31'].str.split(' ', expand=True)[1]
+
+    dataframe['screen_width'] = dataframe['id_33'].str.split('x', expand=True)[0]
+    dataframe['screen_height'] = dataframe['id_33'].str.split('x', expand=True)[1]
+
+    dataframe['id_34'] = dataframe['id_34'].str.split(':', expand=True)[1]
+    dataframe['id_23'] = dataframe['id_23'].str.split(':', expand=True)[1]
+
+    dataframe.loc[dataframe['device_name'].str.contains('SM', na=False), 'device_name'] = 'Samsung'
+    dataframe.loc[dataframe['device_name'].str.contains('SAMSUNG', na=False), 'device_name'] = 'Samsung'
+    dataframe.loc[dataframe['device_name'].str.contains('GT-', na=False), 'device_name'] = 'Samsung'
+    dataframe.loc[dataframe['device_name'].str.contains('Moto G', na=False), 'device_name'] = 'Motorola'
+    dataframe.loc[dataframe['device_name'].str.contains('Moto', na=False), 'device_name'] = 'Motorola'
+    dataframe.loc[dataframe['device_name'].str.contains('moto', na=False), 'device_name'] = 'Motorola'
+    dataframe.loc[dataframe['device_name'].str.contains('LG-', na=False), 'device_name'] = 'LG'
+    dataframe.loc[dataframe['device_name'].str.contains('rv:', na=False), 'device_name'] = 'RV'
+    dataframe.loc[dataframe['device_name'].str.contains('HUAWEI', na=False), 'device_name'] = 'Huawei'
+    dataframe.loc[dataframe['device_name'].str.contains('ALE-', na=False), 'device_name'] = 'Huawei'
+    dataframe.loc[dataframe['device_name'].str.contains('-L', na=False), 'device_name'] = 'Huawei'
+    dataframe.loc[dataframe['device_name'].str.contains('Blade', na=False), 'device_name'] = 'ZTE'
+    dataframe.loc[dataframe['device_name'].str.contains('BLADE', na=False), 'device_name'] = 'ZTE'
+    dataframe.loc[dataframe['device_name'].str.contains('Linux', na=False), 'device_name'] = 'Linux'
+    dataframe.loc[dataframe['device_name'].str.contains('XT', na=False), 'device_name'] = 'Sony'
+    dataframe.loc[dataframe['device_name'].str.contains('HTC', na=False), 'device_name'] = 'HTC'
+    dataframe.loc[dataframe['device_name'].str.contains('ASUS', na=False), 'device_name'] = 'Asus'
+
+    dataframe.loc[dataframe.device_name.isin(dataframe.device_name.value_counts()[dataframe.device_name.value_counts() < 200].index), 'device_name'] = "Others"
+    dataframe['had_id'] = 1
+    gc.collect()
+    
+    return dataframe
+

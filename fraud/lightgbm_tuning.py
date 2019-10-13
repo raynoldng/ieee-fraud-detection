@@ -62,9 +62,8 @@ def tune(train, y_test, bound_lgb, init_points=10, n_iter=15):
     # train on the first 75% of the data and then validation on the last 25%
     idxT = train.index[:3 * len(train) // 4]
     idxV = train.index[3 * len(train) // 4:]
-    # import pdb; pdb.set_trace()
-    train_m, train_val = train.iloc[idxT], train.iloc[idxV]
-    label_m, label_val = y_test.iloc[idxT], y_test.iloc[idxV]
+    train_m, train_val = train.loc[idxT], train.loc[idxV]
+    label_m, label_val = y_test.loc[idxT], y_test.loc[idxV]
     
     lgb_bo = BayesianOptimization(objective, bound_lgb, random_state=42)
     print("-" * 130)
@@ -79,4 +78,3 @@ def tune(train, y_test, bound_lgb, init_points=10, n_iter=15):
     params = lgb_bo.max["params"]
 
     return target, params
-
