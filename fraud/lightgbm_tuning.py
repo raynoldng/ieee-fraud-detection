@@ -7,20 +7,7 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-bound_lgb = {
-    "num_leaves": (70, 600),
-    "min_child_weight": (0.001, 0.07),
-    "feature_fraction": (0.1, 0.9),
-    "bagging_fraction": (0.1, 0.9),
-    "max_depth": (-1, 50),
-    "learning_rate": (0.2, 0.9),
-    "reg_alpha": (0.3, 0.9),
-    "reg_lambda": (0.3, 0.9),
-    "min_data_in_leaf": (50, 300),
-}
-
-
-def tune(train, y_test, init_points=10, n_iter=15):
+def tune(train, y_test, bound_lgb, init_points=10, n_iter=15):
     def objective(
         num_leaves,
         min_child_weight,
@@ -56,10 +43,9 @@ def tune(train, y_test, init_points=10, n_iter=15):
             "reg_lambda": reg_lambda,
             "random_state": 42,
         }
-        oof = np.zeros(len(train_m))
         early_stopping_rounds = 50
-        xgtrain = lgb.Dataset(train_m, label=val1[val1_index])
-        xgvalid = lgb.Dataset(val_m_train, label=val2[val2_index])
+        xgtrain = lgb.Dataset(train_m, label=label_m)
+        xgvalid = lgb.Dataset(train_val, label=label_val)
         num_boost_round = 200
         model_lgb = lgb.train(
             params,
@@ -70,16 +56,16 @@ def tune(train, y_test, init_points=10, n_iter=15):
             verbose_eval=0,
         )
 
-        score = roc_auc_score(val2, model_lgb.predict(val_m_train))
+        score = roc_auc_score(label_val, model_lgb.predict(train_val))
         return score
-    train_m, val_m_train, val1, val2 = train_test_split(
-        train, y_test, test_size=0.3, random_state=10, stratify=y_test
-    )
-    train_m_index = train_m.index
-    val_m_index = val_m_train.index
-    val1_index = val1.index
-    val2_index = val2.index
 
+    # train on the first 75% of the data and then validation on the last 25%
+    idxT = train.index[:3 * len(train) // 4]
+    idxV = train.index[3 * len(train) // 4:]
+    # import pdb; pdb.set_trace()
+    train_m, train_val = train.iloc[idxT], train.iloc[idxV]
+    label_m, label_val = y_test.iloc[idxT], y_test.iloc[idxV]
+    
     lgb_bo = BayesianOptimization(objective, bound_lgb, random_state=42)
     print("-" * 130)
 
