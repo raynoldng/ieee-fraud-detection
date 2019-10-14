@@ -9,10 +9,6 @@ from bayes_opt import BayesianOptimization
 from sklearn.metrics import roc_auc_score
 import warnings
 
-import sys
-sys.path.append('/home/raynoldng/Desktop/ieee-fraud-detection')
-sys.path.append('/home/raynoldng/Desktop/ieee-fraud-detection/fraud')
-
 train = pd.read_pickle('../processed_input/X_train_encoding_deviceinfo_email.pkl')
 test = pd.read_pickle('../processed_input/X_test_encoding_deviceinfo_email.pkl')
 y_train = pd.read_pickle('../input/y_test.pkl')

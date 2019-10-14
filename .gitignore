@@ -4,6 +4,9 @@ input
 # IPython Notebook
 .ipynb_checkpoints/
 processed_input
+input
+stacking_input
+submissions
 
 # pyenv
 .python-version
